@@ -18,6 +18,10 @@ import os
 import gc
 from pathlib import Path
 import uvicorn
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
@@ -150,5 +154,17 @@ async def transcribe_audio(file: UploadFile = File(...), model_size: str = "tiny
         }, status_code=500)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port) 
+    try:
+        port = int(os.environ.get("PORT", 8000))
+        logger.info(f"Starting server on port {port}")
+        uvicorn.run(
+            app, 
+            host="0.0.0.0", 
+            port=port,
+            log_level="info",
+            timeout_keep_alive=30,
+            limit_concurrency=10
+        )
+    except Exception as e:
+        logger.error(f"Failed to start server: {e}")
+        raise 
