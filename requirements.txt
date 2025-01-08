@@ -5,3 +5,4 @@ git+https://github.com/openai/whisper.git
 torch --index-url https://download.pytorch.org/whl/cpu
 numpy>=1.24.0
 ffmpeg-python==0.2.0
+psutil==5.9.8

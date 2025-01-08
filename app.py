@@ -2,6 +2,8 @@ import warnings
 import logging
 import sys
 from typing import Optional
+import psutil
+import time
 
 warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -54,40 +56,49 @@ class WhisperTranscriber:
     def __init__(self):
         self.model = None
         self.device = "cpu"
+        self.last_model_size = None
         
     def load_model(self, model_size="tiny"):
-        if self.model is None:
-            try:
-                # Очищаем память перед загрузкой
+        # Если модель уже загружена с тем же размером, используем её
+        if self.model is not None and self.last_model_size == model_size:
+            return self.model
+            
+        try:
+            # Очищаем память перед загрузкой новой модели
+            if self.model is not None:
+                del self.model
                 gc.collect()
                 torch.cuda.empty_cache() if torch.cuda.is_available() else None
-                
-                # Загружаем модель
-                self.model = whisper.load_model(
-                    model_size,
-                    device=self.device,
-                    download_root="./models",
-                    in_memory=True
-                )
-                
-                self.model.eval()
-                
-                # Отключаем градиенты
-                with torch.no_grad():
-                    for param in self.model.parameters():
-                        param.requires_grad = False
+            
+            logger.info(f"Loading model {model_size}, available memory: {psutil.virtual_memory().available / 1024 / 1024:.2f}MB")
+            
+            self.model = whisper.load_model(
+                model_size,
+                device=self.device,
+                download_root="./models",
+                in_memory=True
+            )
+            
+            self.last_model_size = model_size
+            self.model.eval()
+            
+            with torch.no_grad():
+                for param in self.model.parameters():
+                    param.requires_grad = False
                     
-            except Exception as e:
-                print(f"Error loading model: {e}")
-                raise
-        return self.model
-    
+            return self.model
+            
+        except Exception as e:
+            logger.error(f"Error loading model: {e}", exc_info=True)
+            raise
+
     async def transcribe_file(self, file_path: str, model_size: str = "tiny") -> Optional[str]:
         try:
-            logger.info(f"Loading model {model_size}")
+            start_time = time.time()
+            logger.info(f"Starting transcription of {file_path}")
+            
             model = self.load_model(model_size)
             
-            logger.info(f"Starting transcription of {file_path}")
             with torch.inference_mode():
                 result = model.transcribe(
                     file_path,
@@ -95,20 +106,21 @@ class WhisperTranscriber:
                     temperature=0.0,
                     no_speech_threshold=0.6,
                     condition_on_previous_text=True,
-                    batch_size=4
+                    batch_size=1  # Уменьшаем batch_size до минимума
                 )
             
-            # Очищаем память
-            gc.collect()
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            duration = time.time() - start_time
+            logger.info(f"Transcription completed in {duration:.2f} seconds")
             
-            logger.info("Transcription completed successfully")
             return result["text"]
             
         except Exception as e:
             logger.error(f"Transcription error: {str(e)}", exc_info=True)
             raise
+        finally:
+            # Очищаем память после транскрибации
+            gc.collect()
+            torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
 transcriber = WhisperTranscriber()
 
