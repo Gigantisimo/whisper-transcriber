@@ -1,4 +1,8 @@
 import warnings
+import logging
+import sys
+from typing import Optional
+
 warnings.filterwarnings("ignore", category=FutureWarning)
 
 try:
@@ -18,9 +22,13 @@ import os
 import gc
 from pathlib import Path
 import uvicorn
-import logging
 
-logging.basicConfig(level=logging.INFO)
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
@@ -74,11 +82,12 @@ class WhisperTranscriber:
                 raise
         return self.model
     
-    async def transcribe_file(self, file_path: str, model_size: str = "tiny"):
+    async def transcribe_file(self, file_path: str, model_size: str = "tiny") -> Optional[str]:
         try:
+            logger.info(f"Loading model {model_size}")
             model = self.load_model(model_size)
             
-            # Транскрибация с оптимизированными параметрами
+            logger.info(f"Starting transcription of {file_path}")
             with torch.inference_mode():
                 result = model.transcribe(
                     file_path,
@@ -86,17 +95,19 @@ class WhisperTranscriber:
                     temperature=0.0,
                     no_speech_threshold=0.6,
                     condition_on_previous_text=True,
-                    batch_size=4,  # Уменьшаем batch_size
-                    fp16=False
+                    batch_size=4
                 )
             
-            # Очищаем память после транскрибации
+            # Очищаем память
             gc.collect()
-            torch.cuda.empty_cache() if torch.cuda.is_available() else None
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
             
+            logger.info("Transcription completed successfully")
             return result["text"]
+            
         except Exception as e:
-            print(f"Transcription error: {e}")
+            logger.error(f"Transcription error: {str(e)}", exc_info=True)
             raise
 
 transcriber = WhisperTranscriber()
@@ -112,42 +123,51 @@ async def read_root():
 @app.post("/transcribe/")
 async def transcribe_audio(file: UploadFile = File(...), model_size: str = "tiny"):
     try:
+        logger.info(f"Received file: {file.filename}, size: {file.size}, model: {model_size}")
+        
         if not file.filename:
             return JSONResponse({
                 "status": "error",
                 "message": "No file provided"
             }, status_code=400)
             
-        # Проверяем размер файла (10MB максимум)
         contents = await file.read()
-        if len(contents) > 10 * 1024 * 1024:
+        file_size = len(contents)
+        logger.info(f"File size: {file_size / (1024*1024):.2f} MB")
+        
+        if file_size > 10 * 1024 * 1024:
             return JSONResponse({
                 "status": "error",
                 "message": "File too large. Maximum size is 10MB"
             }, status_code=400)
             
-        # Сохраняем файл
         file_path = UPLOAD_DIR / file.filename
-        with open(file_path, "wb") as buffer:
-            buffer.write(contents)
-        
         try:
-            # Транскрибация
+            with open(file_path, "wb") as buffer:
+                buffer.write(contents)
+            
+            logger.info("Starting transcription process")
             text = await transcriber.transcribe_file(str(file_path), model_size)
-            return JSONResponse({"status": "success", "text": text})
+            
+            return JSONResponse({
+                "status": "success",
+                "text": text
+            })
             
         except Exception as e:
+            logger.error(f"Error during transcription: {str(e)}", exc_info=True)
             return JSONResponse({
                 "status": "error",
                 "message": str(e)
             }, status_code=500)
             
         finally:
-            # Удаляем временный файл
             if file_path.exists():
                 os.remove(file_path)
+                logger.info(f"Removed temporary file: {file_path}")
                 
     except Exception as e:
+        logger.error(f"File processing error: {str(e)}", exc_info=True)
         return JSONResponse({
             "status": "error",
             "message": f"File processing error: {str(e)}"

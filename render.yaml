@@ -3,15 +3,17 @@ services:
     name: whisper-transcriber
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn app:app --host 0.0.0.0 --port $PORT --timeout-keep-alive 75 --workers 1
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
       - key: PYTHON_MEMORY_LIMIT
-        value: 512
+        value: 1024
+      - key: MALLOC_ARENA_MAX
+        value: 2
     plan: free
     autoDeploy: false
     disk:
       name: whisper-data
       mountPath: /app/models
-      sizeGB: 1 
+      sizeGB: 2 
