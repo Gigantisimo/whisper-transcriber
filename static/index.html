@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Whisper Транскрибация</title>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            border: 1px solid #ccc;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .result {
+            margin-top: 20px;
+            white-space: pre-wrap;
+        }
+        .progress {
+            display: none;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Whisper Транскрибация</h2>
+        <div>
+            <select id="modelSize">
+                <option value="tiny">Tiny</option>
+                <option value="base">Base</option>
+                <option value="small">Small</option>
+                <option value="medium" selected>Medium</option>
+                <option value="large">Large</option>
+            </select>
+            <input type="file" id="audioFile" accept=".mp3,.wav,.m4a,.ogg,.flac">
+            <button onclick="transcribe()">Транскрибировать</button>
+        </div>
+        <div class="progress" id="progress">
+            Выполняется транскрибация...
+        </div>
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        async function transcribe() {
+            const file = document.getElementById('audioFile').files[0];
+            const modelSize = document.getElementById('modelSize').value;
+            const progress = document.getElementById('progress');
+            const result = document.getElementById('result');
+
+            if (!file) {
+                alert('Выберите аудио файл');
+                return;
+            }
+
+            if (file.size > 25 * 1024 * 1024) {
+                alert('Файл слишком большой. Максимальный размер: 25MB');
+                return;
+            }
+
+            progress.style.display = 'block';
+            result.textContent = 'Загрузка модели и обработка файла...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`/transcribe/?model_size=${modelSize}`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    result.textContent = data.text;
+                } else {
+                    result.textContent = `Ошибка: ${data.message}`;
+                }
+            } catch (error) {
+                result.textContent = `Ошибка: ${error.message}`;
+                console.error('Error:', error);
+            } finally {
+                progress.style.display = 'none';
+            }
+        }
+
+        // Добавляем проверку размера файла при выборе
+        document.getElementById('audioFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && file.size > 25 * 1024 * 1024) {
+                alert('Файл слишком большой. Максимальный размер: 25MB');
+                this.value = ''; // Очищаем выбор файла
+            }
+        });
+    </script>
+</body>
+</html> 

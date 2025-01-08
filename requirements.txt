@@ -1,0 +1,7 @@
+fastapi==0.104.1
+python-multipart==0.0.6
+uvicorn==0.24.0
+git+https://github.com/openai/whisper.git
+torch --index-url https://download.pytorch.org/whl/cpu
+numpy>=1.24.0
+ffmpeg-python==0.2.0

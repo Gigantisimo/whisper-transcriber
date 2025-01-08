@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  whisper:
+    build: .
+    volumes:
+      - ./audio:/app/audio
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - DISPLAY=${DISPLAY}
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb=512
+    deploy:
+      resources:
+        limits:
+          memory: 12G 
