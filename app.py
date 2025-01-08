@@ -1,3 +1,6 @@
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+
 try:
     import whisper
 except ImportError:
@@ -15,7 +18,6 @@ import gc
 from pathlib import Path
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
-import warnings
 
 app = FastAPI()
 
@@ -40,13 +42,14 @@ class WhisperTranscriber:
         self.model = None
         self.device = "cpu"
         
-    def load_model(self, model_size="small"):
+    def load_model(self, model_size="tiny"):
         if self.model is None:
             try:
-                # Добавляем weights_only=True для безопасной загрузки
-                torch.hub.set_dir("./models")  # Устанавливаем директорию для кэша
+                torch.hub.set_dir("./models")
                 
-                # Загружаем модель с параметром weights_only=True
+                # Очищаем память перед загрузкой
+                gc.collect()
+                
                 self.model = whisper.load_model(
                     model_size,
                     device=self.device,
@@ -54,10 +57,7 @@ class WhisperTranscriber:
                     in_memory=True
                 )
                 
-                # Устанавливаем режим оценки
                 self.model.eval()
-                
-                # Отключаем градиенты для экономии памяти
                 for param in self.model.parameters():
                     param.requires_grad = False
                     
@@ -131,5 +131,3 @@ async def read_root():
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000) 
-
-warnings.filterwarnings("ignore", category=FutureWarning) 

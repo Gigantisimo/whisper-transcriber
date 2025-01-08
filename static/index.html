@@ -30,10 +30,10 @@
         <h2>Whisper Транскрибация</h2>
         <div>
             <select id="modelSize">
-                <option value="tiny">Tiny</option>
+                <option value="tiny" selected>Tiny</option>
                 <option value="base">Base</option>
                 <option value="small">Small</option>
-                <option value="medium" selected>Medium</option>
+                <option value="medium">Medium</option>
                 <option value="large">Large</option>
             </select>
             <input type="file" id="audioFile" accept=".mp3,.wav,.m4a,.ogg,.flac">
@@ -57,8 +57,10 @@
                 return;
             }
 
-            if (file.size > 25 * 1024 * 1024) {
-                alert('Файл слишком большой. Максимальный размер: 25MB');
+            const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+            
+            if (file.size > MAX_FILE_SIZE) {
+                alert('Файл слишком большой. Максимальный размер: 10MB');
                 return;
             }
 

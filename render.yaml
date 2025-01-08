@@ -7,4 +7,11 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.9.0
-    autoDeploy: false 
+      - key: PYTHON_MEMORY_LIMIT
+        value: 512
+    plan: free
+    autoDeploy: false
+    disk:
+      name: whisper-data
+      mountPath: /app/models
+      sizeGB: 1 
